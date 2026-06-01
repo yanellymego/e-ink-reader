@@ -1,7 +1,8 @@
+import os
 from PIL import Image, ImageDraw, ImageFont
 
 # Toggle this depending on where you're running
-USE_SIMULATOR = True
+USE_SIMULATOR = os.getenv("EREADER_SIM", "0") == "1"
 
 # Define screen size
 W, H = 280, 480 
