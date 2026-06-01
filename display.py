@@ -4,16 +4,21 @@ from PIL import Image, ImageDraw, ImageFont
 # Toggle this depending on where you're running
 USE_SIMULATOR = os.getenv("EREADER_SIM", "0") == "1"
 
-# Define screen size
-W, H = 280, 480 
-
-
 font = ImageFont.load_default()
 
-# --- Simulator import (only used if enabled) ---
-if USE_SIMULATOR:
-    import simulator
-else:
+W, H = 280, 480
+
+epd = None
+simulator = None
+
+
+def init_display():
+    global epd, simulator, W, H
+
+    if USE_SIMULATOR:
+        import simulator
+        return
+
     from waveshare_epd import epd3in7
 
     epd = epd3in7.EPD()
