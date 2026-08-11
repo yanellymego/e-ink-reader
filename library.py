@@ -1,6 +1,5 @@
 # Import Libraries
 import os
-import menu
 import display
 import reader
 
@@ -10,34 +9,116 @@ from pathlib import Path
 # Global Variable
 book_list = []
 
-for path in os.listdir("books"):
-    if Path(path).suffix == ".epub":
-        title = path.split("--")[0].strip()
-        book_list.append({"title": title,
-                          "type": "book",
-                          "file_path": os.path.join("books", path)})
+BOOKS_DIRECTORY = "books"
 
-book_list.append({"title": "return to menu",
+for path in os.listdir(BOOKS_DIRECTORY):
+    if Path(path).suffix.lower() == ".epub":
+        # Remove .epub
+        filename = Path(path).stem 
+
+        # Try to separate title and author 
+        if "--" in filename: 
+            title, author = filename.split("--", 1) 
+            title = title.strip() 
+            author = author.strip()
+
+        else:
+            title = filename.strip()
+            author = "Unknown Author"
+
+        book_list.append({"title": title,
+                          "author": author,
+                          "type": "book",
+                          "file_path": os.path.join(BOOKS_DIRECTORY, path)})
+
+book_list.append({"title": "Back to Home",
+                  "author": "",
                   "type": "action", 
                   "action": "RETURN"})
 
+# Library Settings
+VISIBLE_BOOKS = 4 # Number of books that can be displayed at once
+BOOK_BOX_HEIGHT = 55 # Height of each book selection
+BOOK_SPACING = 12 # Space between books
+
 
 # Helper Functions
-def lib_menu_state(index):
+def center_text(draw, text, y, font, fill=0): 
+    bbox = draw.textbbox( (0, 0), text, font=font) 
+    text_width = bbox[2] - bbox[0] 
+    x = (display.W - text_width) / 2 
+    draw.text( (x, y), text, font=font, fill=fill)
+
+
+def truncate_text(draw, text, font, max_width):
+    ellipsis = "..."
+
+    bbox = draw.textbbox(
+        (0, 0),
+        text,
+        font=font
+    )
+
+    if bbox[2] - bbox[0] <= max_width:
+        return text
+
+    while True:
+
+        text = text[:-1]
+
+        test = text.rstrip() + ellipsis
+
+        bbox = draw.textbbox(
+            (0, 0),
+            test,
+            font=font
+        )
+
+        width = bbox[2] - bbox[0]
+
+        if width <= max_width:
+            return test
+
+
+def lib_menu_state(index, scroll_offset):
     def draw(draw, font):
-        draw.text((10, 10), "~ LIBRARY ~", font=font, fill=0)
-    
-        y = 40
+        display.draw_header(draw)
 
-        for i, item in enumerate(book_list):
-            if i == index:
-                prefix = "> "
+        center_text(draw, "Library", 55, display.font_title)
+
+        start_y = 100 
+
+        end_index = min(scroll_offset + VISIBLE_BOOKS, len(book_list))
+
+        visible_items = book_list[scroll_offset:end_index] 
+
+        for visible_index, item in enumerate(visible_items): 
+            actual_index = (scroll_offset + visible_index) 
+            y = (start_y + visible_index * (BOOK_BOX_HEIGHT + BOOK_SPACING))
+    
+            box_x = 15 
+            box_width = display.W - 30
+
+            if actual_index == index: 
+                draw.rectangle((box_x, y, box_x + box_width, y + BOOK_BOX_HEIGHT ), outline=0, width=2)
+
+            # Book Title
+            if item["type"] == "book":
+                title = truncate_text(draw, item["title"], display.font_book_title, box_width - 24)
+                draw.text((box_x + 12, y + 8), title, font=display.font_book_title, fill=0)
+                draw.text((box_x + 12, y + 34), item["author"], font=display.font_book_author, fill=0)
+
             else: 
-                prefix = "  "
+                center_text(draw, item["title"], y + 16, display.font_menu)
 
-            draw.text((10, y), f"{prefix} {item['title']}", font=font, fill=0)
-            y += 25 
-    
+        # Scroll indicator
+        if len(book_list) > VISIBLE_BOOKS:
+            current_position = index + 1 
+            indicator = (f"{current_position} / {len(book_list)}") 
+            bbox = draw.textbbox((0, 0), indicator, font=display.font_date)
+            indicator_width = (bbox[2] - bbox[0]) 
+            draw.text((display.W - indicator_width - 10, display.H - 25), indicator, font=display.font_date, fill=0)
+
     display.render(draw)
 
 
@@ -54,38 +135,57 @@ def run_state(index):
 
     return False
 
-
+def update_clock():
+    lib_menu_state(menu_index,scroll_offset)
 
 # Functions
 def library_menu():
-    menu_index = 0
+    global menu_index
+    global scroll_offset
 
-    lib_menu_state(menu_index)
+    menu_index = 0
+    scroll_offset = 0
+
+    lib_menu_state(menu_index, scroll_offset)
+
+    display.start_clock(update_clock)
+
     while True:
         user_input = input()
 
         if user_input == 's':
             if menu_index == (len(book_list) - 1):
                 menu_index = 0
+                scroll_offset = 0
             else:
                 menu_index += 1
-            lib_menu_state(menu_index)
+                # Scroll down if necessary 
+                if (menu_index >= scroll_offset + VISIBLE_BOOKS): 
+                    scroll_offset += 1
+
+            lib_menu_state(menu_index, scroll_offset)
+
         
         if user_input == 'w':
             if menu_index == 0:
                 menu_index = (len(book_list) - 1)
+                scroll_offset = max(0, len(book_list) - VISIBLE_BOOKS)
             else:
                 menu_index -= 1
-            lib_menu_state(menu_index)
+
+                # Scroll up if necessary
+                if menu_index < scroll_offset:
+                    scroll_offset -= 1
+
+            lib_menu_state(menu_index, scroll_offset)
 
         if user_input == '':
-            lib_menu_state(menu_index)
             should_exit = run_state(menu_index)
 
             if should_exit:
                 return
             
-            lib_menu_state(menu_index)
+            lib_menu_state(menu_index, scroll_offset)
 
 
 
