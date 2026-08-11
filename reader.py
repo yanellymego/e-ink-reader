@@ -53,8 +53,8 @@ def load_epub_sections(path):
 
     return chapters, cover_image
 
-def extract_cover(book):
 
+def extract_cover(book):
     # STEP 1: try OPF metadata correctly
     try:
         meta = book.get_metadata('OPF', 'meta')
@@ -187,6 +187,11 @@ def render_page(sections, section_index, page_index):
     display.render(draw)
 
 
+def prepare_chapter(chapter, draw, max_width, max_height, line_height):
+    lines = blocks_to_lines(chapter["blocks"], font, draw, max_width)
+    chapter["pages"] = paginate_lines(lines, line_height, max_height)
+    
+
 # Book Controller
 def open_book(path):
     chapters, cover_image = load_epub_sections(path)
@@ -201,28 +206,36 @@ def open_book(path):
 
     line_height = font.getmetrics()[0] + font.getmetrics()[1] + 2
 
-    # Build pages per chapter
-    for chapter in chapters:
+    # # Build pages per chapter
+    # for chapter in chapters:
 
-        lines = blocks_to_lines(
-            chapter["blocks"],
-            font,
-            draw,
-            max_width
-        )
+    #     lines = blocks_to_lines(
+    #         chapter["blocks"],
+    #         font,
+    #         draw,
+    #         max_width
+    #     )
 
-        chapter["pages"] = paginate_lines(
-            lines,
-            line_height,
-            max_height
-        )
+    #     chapter["pages"] = paginate_lines(
+    #         lines,
+    #         line_height,
+    #         max_height
+    #     )
 
     state = {
         "mode": "cover",
         "chapter": 0,
         "page": 0
     }
-        
+
+    def prepare_current_chapter():
+        chapter = chapters[state["chapter"]]
+
+        # Don't prepare it twice
+        if "pages" in chapter:
+            return
+
+        prepare_chapter(chapter, draw, max_width, max_height, line_height)    
 
     def render():
         if state["mode"] == "cover":
@@ -241,6 +254,8 @@ def open_book(path):
 
             display.render(lambda d, f: d.bitmap((0, 0), image, fill=0))
             return
+
+        prepare_current_chapter()
         
         render_page(
             chapters,
@@ -267,6 +282,8 @@ def open_book(path):
             continue
 
         if key == "d":
+            prepare_current_chapter()
+
             pages = chapters[state["chapter"]]["pages"]
 
             if state["page"] < len(pages) - 1:
@@ -275,6 +292,8 @@ def open_book(path):
                 if state["chapter"] < len(chapters) - 1:
                     state["chapter"] += 1
                     state["page"] = 0
+
+                    prepare_current_chapter()
 
         elif key == "a":
             # BACK TO COVER
@@ -292,6 +311,8 @@ def open_book(path):
                 if state["chapter"] > 0:
 
                     state["chapter"] -= 1
+
+                    prepare_current_chapter()
 
                     prev_pages = chapters[state["chapter"]]["pages"]
 
