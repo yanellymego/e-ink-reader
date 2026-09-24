@@ -1,15 +1,50 @@
 # Import libraries
 from ebooklib import epub
 from bs4 import BeautifulSoup
-from display import W, H, font
+from display import W, H
 from PIL import Image, ImageDraw, ImageOps
 
 import io
+import os
 import display
+import settings
+import json
+
+#
+# Global Variables
+#
+PROGRESS_FILE = "progress.json"
 
 #
 # Helper Functions
 #
+
+# Progress functions
+def load_progress():
+    if not os.path.exists(PROGRESS_FILE):
+        return {}
+
+    try:
+        with open(PROGRESS_FILE, "r") as file:
+            return json.load(file)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_progress(book_path, chapter, page):
+
+    progress = load_progress()
+
+    book_name = os.path.basename(book_path)
+
+    progress[book_name] = {
+        "chapter": chapter,
+        "page": page
+    }
+
+    with open(PROGRESS_FILE, "w") as file:
+        json.dump(progress, file, indent=4)
+
 
 # EPUB Loading
 def load_epub_sections(path):
@@ -23,6 +58,7 @@ def load_epub_sections(path):
 
     for item in book.get_items():
         if item.get_type() == 9:  # document (HTML content)
+            print("SECTION:", item.get_name())
             soup = BeautifulSoup(item.get_content(), "html.parser")
 
             blocks = []
@@ -54,6 +90,7 @@ def load_epub_sections(path):
     return chapters, cover_image
 
 
+# Cover
 def extract_cover(book):
     # STEP 1: try OPF metadata correctly
     try:
@@ -92,6 +129,8 @@ def build_cover_image(data):
 
     return img
 
+
+# Text processing 
 def blocks_to_lines(blocks, font, draw, max_width):
     lines = []
 
@@ -147,30 +186,34 @@ def paginate_lines(lines, line_height, max_height):
 
     return pages
 
+def invalidate_pages(chapters):
+    for chapter in chapters:
+        chapter.pop("pages", None)
 
 # Rendering
-def render_page(sections, section_index, page_index):
+def render_page(sections, section_index, page_index, reader_font):
 
     current_section = sections[section_index]
     pages = current_section["pages"]
     page = pages[page_index]
 
-    def draw(draw, font):
+    def draw(draw, unused_font):
+
+        foreground = display.get_foreground()
 
         # Header
         draw.text((10, 5),
                   f"{section_index+1}/{len(sections)}  {current_section['title']}",
-                  font=font,
-                  fill=0)
+                  font = reader_font,
+                  fill = foreground)
 
         draw.text((10, 25),
                   f"Page {page_index+1}/{len(pages)}",
-                  font=font,
-                  fill=0)
-
+                  font = reader_font,
+                  fill = foreground)
 
         y = 60
-        line_height = font.getmetrics()[0] + font.getmetrics()[1] + 2
+        line_height = reader_font.getmetrics()[0] + reader_font.getmetrics()[1] + 2
 
         for kind, text in page:
             if kind == "space":
@@ -180,20 +223,95 @@ def render_page(sections, section_index, page_index):
             if y > (H - 10):
                 break
 
-            draw.text((10, y), text, font=font, fill=0)
+            draw.text((10, y), text, font=reader_font, fill=foreground)
             y += line_height
 
 
     display.render(draw)
 
 
-def prepare_chapter(chapter, draw, max_width, max_height, line_height):
-    lines = blocks_to_lines(chapter["blocks"], font, draw, max_width)
+def prepare_chapter(chapter, draw, max_width, max_height, line_height, reader_font):
+    lines = blocks_to_lines(chapter["blocks"], reader_font, draw, max_width)
     chapter["pages"] = paginate_lines(lines, line_height, max_height)
-    
+
+
+# Continue screen
+def render_resume_screen(saved_position, book_title, resume_selection):
+    def draw(draw, font):
+
+        # Book title
+        draw.text(
+            (10, 40),
+            book_title,
+            font=display.font_title,
+            fill=display.get_foreground()
+        )
+
+        # Question
+        draw.text(
+            (10, 110),
+            "Continue reading?",
+            font=display.font_menu,
+            fill=display.get_foreground()
+        )
+
+        # Saved location
+        chapter = saved_position["chapter"] + 1
+        page = saved_position["page"] + 1
+
+        draw.text(
+            (10, 150),
+            f"Chapter {chapter}, Page {page}",
+            font=display.font_date,
+            fill=display.get_foreground()
+        )
+
+        # Options
+        options = [
+            "Continue",
+            "Start from beginning"
+        ]
+
+        selected = resume_selection
+
+        y = 220
+
+        for i, option in enumerate(options):
+
+            box_x = 15
+            box_width = display.W - 30
+            box_height = 55
+
+            if i == selected:
+                draw.rectangle(
+                    (
+                        box_x,
+                        y,
+                        box_x + box_width,
+                        y + box_height
+                    ),
+                    outline = display.get_foreground(),
+                    width = 2
+                )
+
+            draw.text(
+                (box_x + 12, y + 15),
+                option,
+                font = display.font_menu,
+                fill = display.get_foreground()
+            )
+
+            y += 70
+
+    display.render(draw)
+
 
 # Book Controller
 def open_book(path):
+    reader_settings = settings.load_settings()
+
+    reader_font = settings.get_font(reader_settings)
+
     chapters, cover_image = load_epub_sections(path)
 
     print("COVER RAW:", cover_image)
@@ -204,29 +322,25 @@ def open_book(path):
     max_width = W - 20
     max_height = H - 80
 
-    line_height = font.getmetrics()[0] + font.getmetrics()[1] + 2
+    line_height = reader_font.getmetrics()[0] + reader_font.getmetrics()[1] + 2
 
-    # # Build pages per chapter
-    # for chapter in chapters:
+    progress = load_progress()
 
-    #     lines = blocks_to_lines(
-    #         chapter["blocks"],
-    #         font,
-    #         draw,
-    #         max_width
-    #     )
+    book_name = os.path.basename(path)
 
-    #     chapter["pages"] = paginate_lines(
-    #         lines,
-    #         line_height,
-    #         max_height
-    #     )
+    saved_position = progress.get(book_name)
 
     state = {
-        "mode": "cover",
-        "chapter": 0,
-        "page": 0
+            "mode": "cover",
+            "chapter": 0,
+            "page": 0,
+            "resume_selection": 0
     }
+    
+    if saved_position:
+        state["mode"] = "resume"
+    else:
+        state["mode"] = "cover"
 
     def prepare_current_chapter():
         chapter = chapters[state["chapter"]]
@@ -235,24 +349,62 @@ def open_book(path):
         if "pages" in chapter:
             return
 
-        prepare_chapter(chapter, draw, max_width, max_height, line_height)    
+        prepare_chapter(chapter, draw, max_width, max_height, line_height, reader_font)
+
+    def next_section():
+        if state["chapter"] < len(chapters) - 1:
+            state["chapter"] += 1
+            state["page"] = 0
+
+            prepare_current_chapter()
+            render()
+
+    def previous_section():
+        if state["chapter"] > 0:
+            state["chapter"] -= 1
+
+            prepare_current_chapter()
+
+            pages = chapters[state["chapter"]]["pages"]
+
+            if len(pages) > 0:
+                state["page"] = len(pages) - 1
+            else:
+                state["page"] = 0
+
+            render()
 
     def render():
+        if state["mode"] == "resume":
+
+            render_resume_screen(
+                saved_position,
+                book_name,
+                state["resume_selection"]
+            )
+
+            return
+
         if state["mode"] == "cover":
             image = Image.new("L", (W, H), 255)
 
             if cover_image:
                 # ensure correct size
                 img = cover_image.resize((W, H))
-                img = ImageOps.invert(img)
 
                 # paste directly into framebuffer
                 image.paste(img, (0, 0))
             else:
                 draw = ImageDraw.Draw(image)
-                draw.text((10, 10), "No Cover Found", font=font, fill=0)
+                draw.text((10, 10), "No Cover Found", font=display.font_menu, fill=0)
 
-            display.render(lambda d, f: d.bitmap((0, 0), image, fill=0))
+            if display.USE_SIMULATOR:
+                display.simulator.show_image(image)
+            else:
+                display.epd.display_4Gray(
+                    display.epd.getbuffer_4Gray(image)
+                )         
+
             return
 
         prepare_current_chapter()
@@ -260,13 +412,47 @@ def open_book(path):
         render_page(
             chapters,
             state["chapter"],
-            state["page"]
+            state["page"],
+            reader_font
         )
 
     render()
 
     while True:
         key = input().lower()
+
+        if state["mode"] == "resume":
+
+            if key == "s":
+                state["resume_selection"] = 1
+                render()
+
+            elif key == "w":
+                state["resume_selection"] = 0
+                render()
+
+            elif key == "":
+
+                if state["resume_selection"] == 0:
+                    # Continue reading
+                    state["chapter"] = saved_position["chapter"]
+                    state["page"] = saved_position["page"]
+
+                else:
+                    # Start from beginning
+                    state["chapter"] = 0
+                    state["page"] = 0
+                    state["mode"] = "cover"
+
+                if state["resume_selection"] == 0:
+                    state["mode"] = "reading"
+
+                render()
+
+            elif key == "q":
+                return
+
+            continue
 
         if state["mode"] == "cover":
 
@@ -281,7 +467,15 @@ def open_book(path):
             
             continue
 
-        if key == "d":
+        if key == "dd":
+            next_section()
+            continue
+
+        elif key == "aa":
+            previous_section()
+            continue
+
+        elif key == "d":
             prepare_current_chapter()
 
             pages = chapters[state["chapter"]]["pages"]
@@ -323,6 +517,12 @@ def open_book(path):
                         state["page"] = 0
 
         elif key == "q":
+
+            save_progress(
+                path,
+                state["chapter"],
+                state["page"]
+            )
             return
 
         render()

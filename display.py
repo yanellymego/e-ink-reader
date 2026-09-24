@@ -1,13 +1,14 @@
 import os
 import time
 import threading
+import settings
 
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
 # Toggle this depending on where you're running
-USE_SIMULATOR = os.getenv("EREADER_SIM", "0") == "1"
-# USE_SIMULATOR = True
+# USE_SIMULATOR = os.getenv("EREADER_SIM", "0") == "1"
+USE_SIMULATOR = True
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(BASE_DIR, "fonts")
@@ -18,7 +19,7 @@ font_title = ImageFont.truetype(os.path.join(FONT_DIR, "Figtree-SemiBold.ttf"), 
 font_book_title = ImageFont.truetype(os.path.join(FONT_DIR, "Figtree-SemiBold.ttf"), size=21)
 font_book_author = ImageFont.truetype(os.path.join(FONT_DIR, "Figtree-Regular.ttf"), size=17)
 font_menu = ImageFont.truetype(os.path.join(FONT_DIR, "Figtree-Regular.ttf"), size=21)
-font = ImageFont.truetype(os.path.join(FONT_DIR, "Figtree-Regular.ttf"), size=16)
+font = ImageFont.truetype(os.path.join(FONT_DIR, "Figtree-Regular.ttf"), size=17)
 
 
 W, H = 280, 480
@@ -45,8 +46,10 @@ def init_display():
 
 # -- Clock --
 def draw_header(draw):
+    foreground = get_foreground()
+
     now = datetime.now()
-    date_text = now.strftime("%A, %B %d").replace(" 0", " ")
+    date_text = now.strftime("%a, %b %d").replace(" 0", " ")
     time_text = now.strftime("%I:%M %p").lstrip("0")
 
 
@@ -55,7 +58,7 @@ def draw_header(draw):
         (10, 10),
         date_text,
         font=font_date,
-        fill=0
+        fill=foreground
     )
 
     # Time - right side
@@ -71,20 +74,45 @@ def draw_header(draw):
         (W - time_width - 10, 9),
         time_text,
         font=font_time,
-        fill=0
+        fill=foreground
     )
 
     # Divider
     draw.line(
         (10, 38, W - 10, 38),
-        fill=0,
+        fill=foreground,
         width=1
     )
 
 
 # --- Render function ---
+def get_background():
+    current_settings = settings.load_settings()
+
+    if current_settings["dark_mode"]:
+        return 0
+
+    return 255
+
+
+def get_foreground():
+    current_settings = settings.load_settings()
+
+    if current_settings["dark_mode"]:
+        return 255
+
+    return 0
+
+
 def render(draw_fn):
-    image = Image.new('L', (W, H), 255)
+    background = get_background()
+
+    image = Image.new(
+        'L',
+        (W, H),
+        background
+    )
+
     draw = ImageDraw.Draw(image)
 
     draw_fn(draw, font)
@@ -92,7 +120,10 @@ def render(draw_fn):
     if USE_SIMULATOR:
         simulator.show_image(image)
     else:
-        epd.display_4Gray(epd.getbuffer_4Gray(image))
+        epd.display_4Gray(
+            epd.getbuffer_4Gray(image)
+        )
+
 
 # Clock Refresh
 _clock_callback = None
