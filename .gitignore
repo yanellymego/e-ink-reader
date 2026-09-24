@@ -8,3 +8,6 @@ __pycache__/
 
 # Local application data
 progress.json
+
+# Personal notes
+personal_notes.md

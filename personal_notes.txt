@@ -1,0 +1,34 @@
+
+##as of 9/23
+# settings page implemented and works normally as of first round of manual testing
+# FBReader is still a wip
+
+##as of 8/10
+# for the most part, the book formatting is fine. Some get a bit weird here and there but it doesn't really get in the way
+# the books load much faster. Doesn't take longer than around 30 seconds to load
+
+
+##to implement
+# some way to save progress of book to continue where I left off
+    # maybe add a "pick off where left" button in the main menu if possible
+
+# add more books to test reading experience
+    # I think there's a way to set this up wirelessly
+
+# implement other reader!!!
+    # this is the LAST thing to do before v1 is finished
+    # code is on Github, just needs to download FBReader in the raspberry pi and adjust code there
+    # make sure it can read regular files
+    # get netgalley protected file and attempt with as well
+
+
+##to test
+# Manga
+# Light novels
+
+
+##finished
+# some way to "double tap" to skip to next section page (basically I want to be able to skip table of content)
+# "pick off where left" already implemented in the book itself, not main menu yet
+# settings page finished
+# dark mode and light mode works fine
