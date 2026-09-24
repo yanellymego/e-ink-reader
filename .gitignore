@@ -1,6 +1,10 @@
-# User book files
-books/
-protected books/
+# Local e-books
+books/*
+protected books/*
+
+# Keep directory placeholders
+!books/.gitkeep
+!protected books/.gitkeep
 
 # Python
 __pycache__/
