@@ -1,1 +1,10 @@
+# User book files
+books/
 protected books/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local application data
+progress.json
