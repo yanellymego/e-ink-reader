@@ -7,8 +7,8 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
 # Toggle this depending on where you're running
-# USE_SIMULATOR = os.getenv("EREADER_SIM", "0") == "1"
-USE_SIMULATOR = True
+USE_SIMULATOR = os.getenv("EREADER_SIM", "0") == "1"
+# USE_SIMULATOR = True
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(BASE_DIR, "fonts")
