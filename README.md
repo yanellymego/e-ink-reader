@@ -2,7 +2,7 @@
 
 A custom, lightweight e-reader built with Python and designed to run on a Raspberry Pi with a Waveshare 3.7-inch e-ink display. The project focuses on building an e-reader from the ground up, including a custom user interface, EPUB library management, reading settings, and e-ink display integration.
 
-> **Status:** In Progress
+> **Status:** Completed — v1.0
 
 ## Overview
 
@@ -29,7 +29,6 @@ The application is being developed on a computer using a display simulator befor
 
 ## Planned Features
 
-* [ ] FBReader integration for improved EPUB reading
 * [ ] Book metadata display
 * [ ] Page navigation
 * [ ] Improved reading progress and resume functionality
@@ -67,14 +66,12 @@ Custom E-Reader/
 ├── menu.py              # Home and settings menus
 ├── library.py           # EPUB library management
 ├── reader.py            # EPUB processing and reading functionality
-├── fbreader.py          # FBReader integration
 ├── display.py           # Display abstraction and rendering
 ├── simulator.py         # Development display simulator
 ├── settings.py          # Settings management
 ├── settings.json        # Saved user settings
 ├── fonts/               # Application fonts
-├── books/               # EPUB library
-└── protected books/     # Local protected-book files
+└── books/               # EPUB library
 ```
 
 Protected books and other user-specific content are kept outside version control.

@@ -1,16 +1,12 @@
 # Import Libraries
 import library
 import display
-import fbreader
 import settings
 
 
 # Scenes from other files
 def open_library_screen():
     library.main()
-
-def open_fbreader_screen():
-    fbreader.main()
 
 def open_settings_screen():
     settings_menu()
@@ -19,7 +15,6 @@ def open_settings_screen():
 MENU = [
     {"name": "Library", "action": open_library_screen},
     {"name": "Settings", "action": open_settings_screen},
-    {"name": "FBReader", "action": open_fbreader_screen}
 ] 
 
 
